@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -18,12 +18,10 @@ export type Database = {
         Row: {
           class_id: string
           created_at: string
+          date: string
           description: string | null
-          event_date: string
           id: string
           kind: Database["public"]["Enums"]["agenda_kind"]
-          link_url: string | null
-          resource_id: string | null
           teacher_id: string
           title: string
           updated_at: string
@@ -31,12 +29,10 @@ export type Database = {
         Insert: {
           class_id: string
           created_at?: string
+          date: string
           description?: string | null
-          event_date: string
           id?: string
-          kind?: Database["public"]["Enums"]["agenda_kind"]
-          link_url?: string | null
-          resource_id?: string | null
+          kind: Database["public"]["Enums"]["agenda_kind"]
           teacher_id: string
           title: string
           updated_at?: string
@@ -44,12 +40,10 @@ export type Database = {
         Update: {
           class_id?: string
           created_at?: string
+          date?: string
           description?: string | null
-          event_date?: string
           id?: string
           kind?: Database["public"]["Enums"]["agenda_kind"]
-          link_url?: string | null
-          resource_id?: string | null
           teacher_id?: string
           title?: string
           updated_at?: string
@@ -60,13 +54,6 @@ export type Database = {
             columns: ["class_id"]
             isOneToOne: false
             referencedRelation: "classes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agenda_events_resource_id_fkey"
-            columns: ["resource_id"]
-            isOneToOne: false
-            referencedRelation: "resources"
             referencedColumns: ["id"]
           },
         ]
@@ -237,7 +224,6 @@ export type Database = {
       resources: {
         Row: {
           category: Database["public"]["Enums"]["resource_category"]
-          class_id: string | null
           created_at: string
           description: string | null
           file_name: string
@@ -252,7 +238,6 @@ export type Database = {
         }
         Insert: {
           category: Database["public"]["Enums"]["resource_category"]
-          class_id?: string | null
           created_at?: string
           description?: string | null
           file_name: string
@@ -267,7 +252,6 @@ export type Database = {
         }
         Update: {
           category?: Database["public"]["Enums"]["resource_category"]
-          class_id?: string | null
           created_at?: string
           description?: string | null
           file_name?: string
@@ -281,13 +265,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "resources_class_id_fkey"
-            columns: ["class_id"]
-            isOneToOne: false
-            referencedRelation: "classes"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "resources_level_id_fkey"
             columns: ["level_id"]
@@ -471,6 +448,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      my_class_id: { Args: never; Returns: string }
       teaches_student: {
         Args: { _student_id: string; _teacher_id: string }
         Returns: boolean
@@ -478,9 +456,9 @@ export type Database = {
     }
     Enums: {
       account_status: "pending" | "approved" | "rejected"
-      agenda_kind: "homework" | "evaluation"
+      agenda_kind: "devoir" | "evaluation"
       app_role: "super_admin"
-      app_space: "talameed" | "taleem" | "admin"
+      app_space: "eleve" | "enseignant" | "admin"
       resource_category: "cours" | "exercices"
     }
     CompositeTypes: {
@@ -610,9 +588,9 @@ export const Constants = {
   public: {
     Enums: {
       account_status: ["pending", "approved", "rejected"],
-      agenda_kind: ["homework", "evaluation"],
+      agenda_kind: ["devoir", "evaluation"],
       app_role: ["super_admin"],
-      app_space: ["talameed", "taleem", "admin"],
+      app_space: ["eleve", "enseignant", "admin"],
       resource_category: ["cours", "exercices"],
     },
   },
