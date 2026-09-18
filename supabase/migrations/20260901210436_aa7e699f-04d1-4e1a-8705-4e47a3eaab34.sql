@@ -1,0 +1,1 @@
+CREATE POLICY "Teachers grade their submissions" ON public.submissions FOR UPDATE TO authenticated USING (auth.uid() = teacher_id OR has_role(auth.uid(), 'super_admin'::app_role)) WITH CHECK (auth.uid() = teacher_id OR has_role(auth.uid(), 'super_admin'::app_role));

@@ -9,9 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
-import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { SiteFooter } from "@/components/SiteFooter";
 
 function NotFoundComponent() {
   return (
@@ -78,20 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Cahier d'Encre — plateforme scolaire" },
-      {
-        name: "description",
-        content:
-          "Espaces élèves, enseignants et administration : cours, exercices, rendus notés et agenda de classe.",
-      },
-      { property: "og:title", content: "Cahier d'Encre — plateforme scolaire" },
-      {
-        property: "og:description",
-        content:
-          "Espaces élèves, enseignants et administration : cours, exercices, rendus notés et agenda de classe.",
-      },
+      { title: "مداوروس — منصة التلاميذ والأساتذة" },
+      { name: "description", content: "منصة مداوروس بثلاثة فضاءات منفصلة: التلاميذ، التعليم، والإدارة." },
+      { property: "og:title", content: "مداوروس" },
+      { property: "og:description", content: "ثلاثة فضاءات منفصلة بجلسات مستقلة على منصة مداوروس." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -102,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..800;1,9..144,400..700&family=Karla:ital,wght@0,300..700;1,300..600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap",
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
@@ -115,7 +108,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="ar" dir="rtl">
       <head>
         <HeadContent />
       </head>
@@ -132,9 +125,13 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster position="top-center" richColors />
+      <div className="flex min-h-screen flex-col">
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <div className="flex-1">
+          <Outlet />
+        </div>
+        <SiteFooter />
+      </div>
     </QueryClientProvider>
   );
 }

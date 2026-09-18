@@ -1,0 +1,378 @@
+-- ============================================================================
+-- Madaurous — Schéma complet (buckets créés via l'outil Storage)
+-- ============================================================================
+
+-- 1. Types énumérés ------------------------------------------------------------
+
+DO $$ BEGIN CREATE TYPE public.app_role AS ENUM ('super_admin'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE public.app_space AS ENUM ('talameed', 'taleem', 'admin'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE public.account_status AS ENUM ('pending', 'approved', 'rejected'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE public.resource_category AS ENUM ('cours', 'exercices'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 2. Profils et rôles ----------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  space public.app_space NOT NULL,
+  status public.account_status NOT NULL DEFAULT 'pending',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz,
+  full_name text,
+  level_id uuid,
+  class_id uuid,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles TO authenticated;
+GRANT ALL ON public.profiles TO service_role;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role public.app_role NOT NULL,
+  UNIQUE (user_id, role)
+);
+GRANT SELECT ON public.user_roles TO authenticated;
+GRANT ALL ON public.user_roles TO service_role;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+-- 3. Fonctions d'autorisation --------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role)
+$$;
+
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  _space public.app_space;
+  _status public.account_status := 'pending';
+  _is_first_admin boolean := false;
+BEGIN
+  _space := COALESCE(NEW.raw_user_meta_data->>'space', 'talameed')::public.app_space;
+  IF _space = 'admin' AND NOT EXISTS (SELECT 1 FROM public.profiles WHERE space = 'admin') THEN
+    _status := 'approved';
+    _is_first_admin := true;
+  END IF;
+  INSERT INTO public.profiles (id, email, space, status, reviewed_at)
+  VALUES (NEW.id, COALESCE(NEW.email, ''), _space, _status, CASE WHEN _is_first_admin THEN now() ELSE NULL END);
+  IF _is_first_admin THEN
+    INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'super_admin');
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 4. Niveaux et classes --------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.levels (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  code text UNIQUE,
+  position integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.levels TO authenticated;
+GRANT ALL ON public.levels TO service_role;
+ALTER TABLE public.levels ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.classes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  code text,
+  level_id uuid REFERENCES public.levels(id) ON DELETE SET NULL,
+  capacity integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.classes TO authenticated;
+GRANT ALL ON public.classes TO service_role;
+ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.profiles
+  ALTER COLUMN level_id SET DATA TYPE uuid,
+  ALTER COLUMN class_id SET DATA TYPE uuid;
+DO $$ BEGIN
+  ALTER TABLE public.profiles ADD CONSTRAINT profiles_level_id_fkey
+    FOREIGN KEY (level_id) REFERENCES public.levels(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER TABLE public.profiles ADD CONSTRAINT profiles_class_id_fkey
+    FOREIGN KEY (class_id) REFERENCES public.classes(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DROP TRIGGER IF EXISTS update_levels_updated_at ON public.levels;
+CREATE TRIGGER update_levels_updated_at BEFORE UPDATE ON public.levels FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+DROP TRIGGER IF EXISTS update_classes_updated_at ON public.classes;
+CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON public.classes FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
+CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- 5. Affectation multi-classes des enseignants ---------------------------------
+
+CREATE TABLE IF NOT EXISTS public.teacher_classes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  class_id uuid NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (teacher_id, class_id)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.teacher_classes TO authenticated;
+GRANT ALL ON public.teacher_classes TO service_role;
+ALTER TABLE public.teacher_classes ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.teaches_student(_teacher_id uuid, _student_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    JOIN public.teacher_classes tc ON tc.class_id = p.class_id
+    WHERE p.id = _student_id AND tc.teacher_id = _teacher_id
+  )
+$$;
+
+-- 6. Ressources pédagogiques --------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.resources (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  level_id uuid REFERENCES public.levels(id) ON DELETE SET NULL,
+  category public.resource_category NOT NULL,
+  title text NOT NULL,
+  description text,
+  file_path text NOT NULL,
+  file_name text NOT NULL,
+  mime_type text,
+  file_size bigint,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.resources TO authenticated;
+GRANT ALL ON public.resources TO service_role;
+ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS resources_level_category_idx ON public.resources (level_id, category);
+DROP TRIGGER IF EXISTS update_resources_updated_at ON public.resources;
+CREATE TRIGGER update_resources_updated_at BEFORE UPDATE ON public.resources FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+-- 7. Rendus des élèves, commentaires, notifications ----------------------------
+
+CREATE TABLE IF NOT EXISTS public.submissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  resource_id uuid NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
+  student_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  teacher_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
+  level_id uuid REFERENCES public.levels(id) ON DELETE SET NULL,
+  file_path text NOT NULL,
+  file_name text NOT NULL,
+  mime_type text,
+  file_size bigint,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.submissions TO authenticated;
+GRANT ALL ON public.submissions TO service_role;
+ALTER TABLE public.submissions ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS submissions_teacher_idx ON public.submissions(teacher_id);
+CREATE INDEX IF NOT EXISTS submissions_student_idx ON public.submissions(student_id);
+DROP TRIGGER IF EXISTS update_submissions_updated_at ON public.submissions;
+CREATE TRIGGER update_submissions_updated_at BEFORE UPDATE ON public.submissions FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TABLE IF NOT EXISTS public.submission_comments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  submission_id uuid NOT NULL REFERENCES public.submissions(id) ON DELETE CASCADE,
+  author_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  body text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.submission_comments TO authenticated;
+GRANT ALL ON public.submission_comments TO service_role;
+ALTER TABLE public.submission_comments ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS submission_comments_submission_idx ON public.submission_comments(submission_id);
+
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  actor_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  kind text NOT NULL,
+  title text NOT NULL,
+  body text,
+  submission_id uuid REFERENCES public.submissions(id) ON DELETE CASCADE,
+  read_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.notifications TO authenticated;
+GRANT ALL ON public.notifications TO service_role;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON public.notifications(user_id, read_at);
+
+-- 8. Politiques RLS -----------------------------------------------------------
+
+DROP POLICY IF EXISTS "Users read own profile" ON public.profiles;
+CREATE POLICY "Users read own profile" ON public.profiles FOR SELECT TO authenticated USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Super admin reads all profiles" ON public.profiles;
+CREATE POLICY "Super admin reads all profiles" ON public.profiles FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin updates profiles" ON public.profiles;
+CREATE POLICY "Super admin updates profiles" ON public.profiles FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'super_admin')) WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin deletes profiles" ON public.profiles;
+CREATE POLICY "Super admin deletes profiles" ON public.profiles FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Teachers read their students profiles" ON public.profiles;
+CREATE POLICY "Teachers read their students profiles" ON public.profiles FOR SELECT TO authenticated USING (public.teaches_student(auth.uid(), id));
+
+DROP POLICY IF EXISTS "Users read own roles" ON public.user_roles;
+CREATE POLICY "Users read own roles" ON public.user_roles FOR SELECT TO authenticated USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Authenticated read levels" ON public.levels;
+CREATE POLICY "Authenticated read levels" ON public.levels FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Super admin insert levels" ON public.levels;
+CREATE POLICY "Super admin insert levels" ON public.levels FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin update levels" ON public.levels;
+CREATE POLICY "Super admin update levels" ON public.levels FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'super_admin')) WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin delete levels" ON public.levels;
+CREATE POLICY "Super admin delete levels" ON public.levels FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'super_admin'));
+
+DROP POLICY IF EXISTS "Authenticated read classes" ON public.classes;
+CREATE POLICY "Authenticated read classes" ON public.classes FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Super admin insert classes" ON public.classes;
+CREATE POLICY "Super admin insert classes" ON public.classes FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin update classes" ON public.classes;
+CREATE POLICY "Super admin update classes" ON public.classes FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'super_admin')) WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin delete classes" ON public.classes;
+CREATE POLICY "Super admin delete classes" ON public.classes FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'super_admin'));
+
+DROP POLICY IF EXISTS "Authenticated read teacher classes" ON public.teacher_classes;
+CREATE POLICY "Authenticated read teacher classes" ON public.teacher_classes FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Super admin insert teacher classes" ON public.teacher_classes;
+CREATE POLICY "Super admin insert teacher classes" ON public.teacher_classes FOR INSERT TO authenticated WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin update teacher classes" ON public.teacher_classes;
+CREATE POLICY "Super admin update teacher classes" ON public.teacher_classes FOR UPDATE TO authenticated USING (public.has_role(auth.uid(), 'super_admin')) WITH CHECK (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Super admin delete teacher classes" ON public.teacher_classes;
+CREATE POLICY "Super admin delete teacher classes" ON public.teacher_classes FOR DELETE TO authenticated USING (public.has_role(auth.uid(), 'super_admin'));
+
+DROP POLICY IF EXISTS "Authenticated read resources" ON public.resources;
+CREATE POLICY "Authenticated read resources" ON public.resources FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Teachers insert own resources" ON public.resources;
+CREATE POLICY "Teachers insert own resources" ON public.resources FOR INSERT TO authenticated WITH CHECK (auth.uid() = teacher_id);
+DROP POLICY IF EXISTS "Teachers update own resources" ON public.resources;
+CREATE POLICY "Teachers update own resources" ON public.resources FOR UPDATE TO authenticated USING (auth.uid() = teacher_id) WITH CHECK (auth.uid() = teacher_id);
+DROP POLICY IF EXISTS "Teachers delete own resources" ON public.resources;
+CREATE POLICY "Teachers delete own resources" ON public.resources FOR DELETE TO authenticated USING (auth.uid() = teacher_id OR public.has_role(auth.uid(), 'super_admin'));
+
+DROP POLICY IF EXISTS "Students insert own submissions" ON public.submissions;
+CREATE POLICY "Students insert own submissions" ON public.submissions FOR INSERT TO authenticated WITH CHECK (auth.uid() = student_id);
+DROP POLICY IF EXISTS "Students read own submissions" ON public.submissions;
+CREATE POLICY "Students read own submissions" ON public.submissions FOR SELECT TO authenticated USING (auth.uid() = student_id);
+DROP POLICY IF EXISTS "Teachers read their submissions" ON public.submissions;
+CREATE POLICY "Teachers read their submissions" ON public.submissions FOR SELECT TO authenticated USING (auth.uid() = teacher_id);
+DROP POLICY IF EXISTS "Super admin reads submissions" ON public.submissions;
+CREATE POLICY "Super admin reads submissions" ON public.submissions FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'super_admin'));
+DROP POLICY IF EXISTS "Students delete own submissions" ON public.submissions;
+CREATE POLICY "Students delete own submissions" ON public.submissions FOR DELETE TO authenticated USING (auth.uid() = student_id OR public.has_role(auth.uid(), 'super_admin'));
+
+DROP POLICY IF EXISTS "Teachers comment on their submissions" ON public.submission_comments;
+CREATE POLICY "Teachers comment on their submissions" ON public.submission_comments FOR INSERT TO authenticated WITH CHECK (
+  auth.uid() = author_id
+  AND EXISTS (SELECT 1 FROM public.submissions s WHERE s.id = submission_id AND s.teacher_id = auth.uid())
+);
+DROP POLICY IF EXISTS "Participants read comments" ON public.submission_comments;
+CREATE POLICY "Participants read comments" ON public.submission_comments FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.submissions s WHERE s.id = submission_id AND (s.teacher_id = auth.uid() OR s.student_id = auth.uid()))
+  OR public.has_role(auth.uid(), 'super_admin')
+);
+DROP POLICY IF EXISTS "Authors update own comments" ON public.submission_comments;
+CREATE POLICY "Authors update own comments" ON public.submission_comments FOR UPDATE TO authenticated USING (auth.uid() = author_id) WITH CHECK (auth.uid() = author_id);
+DROP POLICY IF EXISTS "Authors delete own comments" ON public.submission_comments;
+CREATE POLICY "Authors delete own comments" ON public.submission_comments FOR DELETE TO authenticated USING (auth.uid() = author_id OR public.has_role(auth.uid(), 'super_admin'));
+
+DROP POLICY IF EXISTS "Users read own notifications" ON public.notifications;
+CREATE POLICY "Users read own notifications" ON public.notifications FOR SELECT TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users update own notifications" ON public.notifications;
+CREATE POLICY "Users update own notifications" ON public.notifications FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users delete own notifications" ON public.notifications;
+CREATE POLICY "Users delete own notifications" ON public.notifications FOR DELETE TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Actors create notifications" ON public.notifications;
+CREATE POLICY "Actors create notifications" ON public.notifications FOR INSERT TO authenticated WITH CHECK (auth.uid() = actor_id);
+
+-- 9. Permissions des fonctions ------------------------------------------------
+
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.update_updated_at_column() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.has_role(uuid, public.app_role) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.teaches_student(uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.teaches_student(uuid, uuid) TO authenticated, service_role;
+
+-- 10. Politiques de stockage (buckets créés via l'outil Storage) ---------------
+
+DROP POLICY IF EXISTS "Authenticated read resource files" ON storage.objects;
+CREATE POLICY "Authenticated read resource files" ON storage.objects
+  FOR SELECT TO authenticated USING (bucket_id = 'resources');
+DROP POLICY IF EXISTS "Teachers upload own resource files" ON storage.objects;
+CREATE POLICY "Teachers upload own resource files" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'resources' AND (storage.foldername(name))[1] = auth.uid()::text);
+DROP POLICY IF EXISTS "Teachers update own resource files" ON storage.objects;
+CREATE POLICY "Teachers update own resource files" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'resources' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'resources' AND (storage.foldername(name))[1] = auth.uid()::text);
+DROP POLICY IF EXISTS "Teachers delete own resource files" ON storage.objects;
+CREATE POLICY "Teachers delete own resource files" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'resources' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Students manage own submission files" ON storage.objects;
+CREATE POLICY "Students manage own submission files" ON storage.objects
+  FOR ALL TO authenticated
+  USING (bucket_id = 'submissions' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'submissions' AND (storage.foldername(name))[1] = auth.uid()::text);
+DROP POLICY IF EXISTS "Teachers read submission files" ON storage.objects;
+CREATE POLICY "Teachers read submission files" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'submissions'
+    AND EXISTS (SELECT 1 FROM public.submissions s WHERE s.file_path = name AND s.teacher_id = auth.uid())
+  );
+
+-- 11. Données initiales : les 7 niveaux et 7 classes -------------------------
+
+INSERT INTO public.levels (id, name, code, position) VALUES
+  ('c72155c6-4a88-437a-81a5-be7d423c260e', 'السنة الأولى ثانوي جذع مشترك علوم و تكنولوجيا', '1ASS', 1),
+  ('0ba2ce1f-d3ca-401c-98fa-dae727c4f467', 'السنة الأولى ثانوي جذع مشترك آداب', '1ASL', 2),
+  ('b43b093d-668e-4e98-a334-f76761f548ba', 'السنة الثانية ثانوي شعب تسيير آداب و لغات', '2ASL', 3),
+  ('de3b38fd-8654-45c0-aadc-ecdf83bc2a21', 'السنة الثانية ثانوي شعب علمي و رياضي', '2ASS', 4),
+  ('5e2f95b4-d1fe-4c2c-ac45-726932c571bf', 'السنة الثالثة من التعليم الثانوي شعب علمي و رياضي', '3ASS', 5),
+  ('fc05b399-430b-48a0-b1e0-08a4c04d8d74', 'السنة الثالثة ثانوي شعب آداب و لغات', '3ASL', 6),
+  ('4f1ff455-82a9-4ce9-96e3-b3bd936dbac0', 'السنة الثالثة ثانوي شعب تسيير و إقتصاد', '3ASG', 7)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.classes (id, name, level_id, capacity) VALUES
+  ('43ab7b73-9f1c-410f-baf2-d751d19981e9', '1أ1', 'c72155c6-4a88-437a-81a5-be7d423c260e', 1),
+  ('26ccaad0-8ede-4f48-91de-e5324219be5a', '1ل1', '0ba2ce1f-d3ca-401c-98fa-dae727c4f467', 4),
+  ('14d5f05a-ba92-46c7-af70-a59ec8a85dca', '2أ1', 'de3b38fd-8654-45c0-aadc-ecdf83bc2a21', 2),
+  ('a68ff757-9449-4195-b07d-78d3e284d1a8', '3أ1', '5e2f95b4-d1fe-4c2c-ac45-726932c571bf', 3),
+  ('a353d2ae-9889-49d6-87ff-1a5f0e27fce5', '3ت إ1', '4f1ff455-82a9-4ce9-96e3-b3bd936dbac0', 7),
+  ('62265b10-a4fc-47c9-ae0c-a259ddf4fc0f', '2ل1', 'b43b093d-668e-4e98-a334-f76761f548ba', 5),
+  ('90458272-66e5-464d-b48a-66f548ff8ff2', '3ل1', 'fc05b399-430b-48a0-b1e0-08a4c04d8d74', 6)
+ON CONFLICT (id) DO NOTHING;

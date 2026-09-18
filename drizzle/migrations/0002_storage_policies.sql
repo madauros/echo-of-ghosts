@@ -23,5 +23,7 @@ CREATE POLICY "Students manage own submission files" ON storage.objects
 DROP POLICY IF EXISTS "Teachers read submission files" ON storage.objects;
 CREATE POLICY "Teachers read submission files" ON storage.objects
   FOR SELECT TO authenticated
-  USING (bucket_id = 'submissions'
-    AND EXISTS (SELECT 1 FROM public.submissions s WHERE s.file_path = storage.objects.name AND s.teacher_id = auth.uid()));
+  USING (
+    bucket_id = 'submissions'
+    AND EXISTS (SELECT 1 FROM public.submissions s WHERE s.file_path = name AND s.teacher_id = auth.uid())
+  );
