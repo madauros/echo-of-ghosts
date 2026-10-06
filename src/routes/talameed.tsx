@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { UserRound } from "lucide-react";
 import { SpaceAuth, Wordmark } from "@/components/SpaceAuth";
 import { StudentResources } from "@/components/resources/StudentResources";
 import { StudentSubmissions } from "@/components/resources/StudentSubmissions";
 import { StudentAgenda } from "@/components/agenda/StudentAgenda";
+import { QuestionsSpace } from "@/components/questions/QuestionsSpace";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { useNotifications } from "@/components/resources/useSubmissions";
+import { StudentGrades } from "@/components/grades/Grades";
+import { StudentHomeworks } from "@/components/grades/Homework";
+import { StudentTour, useTourEligible, type TourStep } from "@/components/StudentTour";
 import { STATUS_LABEL } from "@/lib/spaces";
+import { useSpaceSection } from "@/hooks/useSpaceSection";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -26,7 +31,7 @@ export const Route = createFileRoute("/talameed")({
   component: Page,
 });
 
-type Tab = "resources" | "agenda" | "answers" | "notifications" | "account";
+type Tab = "resources" | "agenda" | "grades" | "questions" | "answers" | "notifications" | "account";
 
 function Page() {
   return (
@@ -66,12 +71,43 @@ function StudentShell({
   classId: string | null;
   signOut: () => Promise<void>;
 }) {
-  const [tab, setTab] = useState<Tab>("resources");
+  const [tab, setTab, sectionReady] = useSpaceSection<Tab>("talameed", userId, "resources", ["resources", "agenda", "grades", "questions", "answers", "notifications", "account"]);
   const notifications = useNotifications(client, userId);
+  const tour = useTourEligible(userId);
+  const tourSteps: TourStep<Tab>[] = [
+    { key: "resources", title: "الدروس والتمارين", text: "هنا تجد دروس وتمارين قسمك مرتبة حسب المحاور، ويمكنك إرسال أجوبتك." },
+    { key: "agenda", title: "المفكرة", text: "تابع مواعيد الواجبات المنزلية والتقييمات التي يبرمجها أساتذتك." },
+    { key: "grades", title: "المراقبة المستمرة", text: "اطّلع على نقاطك وتقييماتك." },
+    { key: "questions", title: "الأسئلة والأجوبة", text: "اطرح سؤالك على أستاذ قسمك بملف، وشاهد أسئلة زملائك وأجوبة الأستاذ." },
+    { key: "answers", title: "أجوبتي", text: "راجع الأجوبة التي أرسلتها وتصحيحها." },
+    { key: "notifications", title: "الإشعارات", text: "تصلك هنا التنبيهات عند إضافة حدث جديد أو رد على سؤالك." },
+    { key: "account", title: "حسابي", text: "معلوماتك الشخصية، قسمك ومستواك، وزر تسجيل الخروج." },
+  ];
+
+  const [className, setClassName] = useState<string | null>(null);
+  const [levelName, setLevelName] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      if (classId) {
+        const { data } = await client.from("classes").select("name").eq("id", classId).maybeSingle();
+        if (active) setClassName(data?.name ?? null);
+      }
+      if (levelId) {
+        const { data } = await client.from("levels").select("name").eq("id", levelId).maybeSingle();
+        if (active) setLevelName(data?.name ?? null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [client, classId, levelId]);
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: "resources", label: "الدروس والتمارين" },
     { key: "agenda", label: "المفكرة" },
+    { key: "grades", label: "المراقبة المستمرة" },
+    { key: "questions", label: "الأسئلة والأجوبة" },
     { key: "answers", label: "أجوبتي" },
     { key: "notifications", label: "الإشعارات", badge: notifications.unread },
     { key: "account", label: "حسابي" },
@@ -89,6 +125,7 @@ function StudentShell({
                 key={t.key}
                 type="button"
                 className="nav-menu-item"
+                data-tour={t.key}
                 data-active={tab === t.key}
                 onClick={() => setTab(t.key)}
               >
@@ -107,6 +144,9 @@ function StudentShell({
         </div>
       </header>
 
+      {tour.eligible && sectionReady ? (
+        <StudentTour steps={tourSteps} initialStep={tab} onStep={setTab} onClose={tour.close} onDisable={tour.disable} />
+      ) : null}
       <main className="mx-auto w-full max-w-4xl px-4 py-10">
         {tab === "resources" ? (
           <StudentResources
@@ -119,6 +159,19 @@ function StudentShell({
           />
         ) : tab === "agenda" ? (
           <StudentAgenda client={client} classId={classId} studentId={userId} />
+            ) : tab === "grades" ? (
+          <div className="space-y-6">
+            <StudentGrades client={client} classId={classId} studentId={userId} />
+            <StudentHomeworks client={client} classId={classId} studentId={userId} />
+          </div>
+        ) : tab === "questions" ? (
+          <QuestionsSpace
+            client={client}
+            userId={userId}
+            userName={name}
+            role="student"
+            classId={classId}
+          />
         ) : tab === "answers" ? (
           <StudentSubmissions client={client} studentId={userId} />
         ) : tab === "notifications" ? (
@@ -141,6 +194,14 @@ function StudentShell({
                 <dd className="font-semibold text-foreground" dir="ltr">
                   {email}
                 </dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">القسم</dt>
+                <dd className="font-semibold text-foreground">{className ?? "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">المستوى</dt>
+                <dd className="font-semibold text-foreground">{levelName ?? "—"}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">الحالة</dt>

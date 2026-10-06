@@ -16,6 +16,7 @@ interface Props {
     profile: ProfileRow;
     client: SupabaseClient<Database>;
     signOut: () => Promise<void>;
+    isAdmin: boolean;
   }) => ReactNode;
 }
 
@@ -50,9 +51,11 @@ export function SpaceAuth({ space, children }: Props) {
     return () => sub.subscription.unsubscribe();
   }, [client]);
 
+  const sessionUserId = session?.user.id;
+
   useEffect(() => {
     let active = true;
-    if (!session) {
+    if (!sessionUserId) {
       setProfile(null);
       setIsAdmin(false);
       setProfileLoaded(false);
@@ -61,8 +64,8 @@ export function SpaceAuth({ space, children }: Props) {
     setProfileLoaded(false);
     void (async () => {
       const [{ data: prof }, { data: roles }] = await Promise.all([
-        client.from("profiles").select("*").eq("id", session.user.id).maybeSingle(),
-        client.from("user_roles").select("role").eq("user_id", session.user.id),
+        client.from("profiles").select("*").eq("id", sessionUserId).maybeSingle(),
+        client.from("user_roles").select("role").eq("user_id", sessionUserId),
       ]);
       if (!active) return;
       setProfile(prof ?? null);
@@ -72,7 +75,7 @@ export function SpaceAuth({ space, children }: Props) {
     return () => {
       active = false;
     };
-  }, [client, session]);
+  }, [client, sessionUserId]);
 
 
   const signOut = async () => {
@@ -133,7 +136,7 @@ export function SpaceAuth({ space, children }: Props) {
   const spaceAllowed = !!profile && (isAdmin || profile.space === space);
 
   if (session && profile && profile.status === "approved" && spaceAllowed) {
-    return <>{children({ session, profile, client, signOut })}</>;
+    return <>{children({ session, profile, client, signOut, isAdmin })}</>;
   }
 
   if (session && profile && profile.status === "approved" && !spaceAllowed) {

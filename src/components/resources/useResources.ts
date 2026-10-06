@@ -118,3 +118,31 @@ export function useTeacherClasses(client: SupabaseClient<Database>, teacherId: s
   }, [client, teacherId]);
   return classes;
 }
+
+export type ChapterRow = Database["public"]["Tables"]["chapters"]["Row"];
+
+/** Chapters of one level (or all levels when levelId is undefined). */
+export function useChapters(client: SupabaseClient<Database>, levelId?: string | null) {
+  const [chapters, setChapters] = useState<ChapterRow[]>([]);
+  useEffect(() => {
+    let active = true;
+    if (levelId === null) {
+      setChapters([]);
+      return;
+    }
+    let q = client.from("chapters").select("*");
+    if (levelId) q = q.eq("level_id", levelId);
+    void q
+      .order("position", { ascending: true })
+      .order("name", { ascending: true })
+      .then(({ data }) => {
+        if (active) setChapters(data ?? []);
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, levelId]);
+  return chapters;
+}
+
+export const NO_CHAPTER_LABEL = "بدون محور";

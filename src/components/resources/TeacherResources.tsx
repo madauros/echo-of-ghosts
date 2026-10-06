@@ -10,6 +10,8 @@ import {
   useLevels,
   useResourceList,
   useTeacherClasses,
+  useChapters,
+  NO_CHAPTER_LABEL,
   type Category,
   type ResourceRow,
 } from "./useResources";
@@ -29,6 +31,11 @@ export function TeacherResources({
   const [title, setTitle] = useState("");
   const [levelId, setLevelId] = useState("");
   const [classId, setClassId] = useState("");
+  const [chapterId, setChapterId] = useState("");
+  const [filterLevel, setFilterLevel] = useState("");
+  const [filterChapter, setFilterChapter] = useState("");
+  const chapters = useChapters(client, levelId === "" ? null : levelId);
+  const allChapters = useChapters(client);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ResourceRow | null>(null);
@@ -38,6 +45,7 @@ export function TeacherResources({
     setTitle("");
     setLevelId("");
     setClassId("");
+    setChapterId("");
     setFile(null);
   };
 
@@ -53,6 +61,7 @@ export function TeacherResources({
           title: title.trim(),
           level_id: levelId === "" ? null : levelId,
           class_id: classId === "" ? null : classId,
+          chapter_id: chapterId === "" ? null : chapterId,
           category,
         })
         .eq("id", editing.id);
@@ -92,6 +101,7 @@ export function TeacherResources({
       teacher_id: teacherId,
       level_id: levelId === "" ? null : levelId,
       class_id: classId === "" ? null : classId,
+      chapter_id: chapterId === "" ? null : chapterId,
       category,
       title: title.trim() === "" ? file.name : title.trim(),
       file_path: path,
@@ -132,6 +142,15 @@ export function TeacherResources({
   const className = (id: string | null) =>
     id === null ? "كل الأقسام" : (classes.find((c) => c.id === id)?.name ?? "قسم محدد");
 
+  const chapterName = (id: string | null) =>
+    id === null ? NO_CHAPTER_LABEL : (allChapters.find((c) => c.id === id)?.name ?? NO_CHAPTER_LABEL);
+
+  const visibleRows = rows.filter(
+    (r) =>
+      (filterLevel === "" || r.level_id === filterLevel) &&
+      (filterChapter === "" || (filterChapter === "none" ? r.chapter_id === null : r.chapter_id === filterChapter)),
+  );
+
   const levelName = (id: string | null) => levels.find((l) => l.id === id)?.name ?? "كل المستويات";
 
   return (
@@ -150,7 +169,7 @@ export function TeacherResources({
           <option value="cours">{CATEGORY_LABEL.cours}</option>
           <option value="exercices">{CATEGORY_LABEL.exercices}</option>
         </select>
-        <select className="field-input" value={levelId} onChange={(e) => setLevelId(e.target.value)}>
+        <select className="field-input" value={levelId} onChange={(e) => { setLevelId(e.target.value); setChapterId(""); }}>
           <option value="">كل المستويات</option>
           {levels.map((l) => (
             <option key={l.id} value={l.id}>
@@ -167,6 +186,17 @@ export function TeacherResources({
                 {c.name}
               </option>
             ))}
+        </select>
+        <select
+          className="field-input sm:col-span-2"
+          value={chapterId}
+          disabled={levelId === ""}
+          onChange={(e) => setChapterId(e.target.value)}
+        >
+          <option value="">{levelId === "" ? "اختر المستوى لتحديد المحور" : NO_CHAPTER_LABEL}</option>
+          {chapters.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
         </select>
         <input
           className="field-input sm:col-span-2"
@@ -196,19 +226,31 @@ export function TeacherResources({
 
       {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="mt-6 flex flex-wrap gap-3">
+        <select className="field-input w-auto min-w-40 text-sm" value={filterLevel} onChange={(e) => { setFilterLevel(e.target.value); setFilterChapter(""); }} aria-label="تصفية حسب المستوى">
+          <option value="">كل المستويات</option>
+          {levels.map((l) => (<option key={l.id} value={l.id}>{l.name}</option>))}
+        </select>
+        <select className="field-input w-auto min-w-40 text-sm" value={filterChapter} onChange={(e) => setFilterChapter(e.target.value)} aria-label="تصفية حسب المحور">
+          <option value="">كل المحاور</option>
+          {allChapters.filter((c) => filterLevel === "" || c.level_id === filterLevel).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+          <option value="none">{NO_CHAPTER_LABEL}</option>
+        </select>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
         {loading ? (
           <p className="p-6 text-sm text-muted-foreground">جارٍ التحميل…</p>
-        ) : rows.length === 0 ? (
+        ) : visibleRows.length === 0 ? (
           <p className="p-6 text-sm text-muted-foreground">لا توجد ملفات بعد.</p>
         ) : (
           <ul className="divide-y divide-border">
-            {rows.map((r) => (
+            {visibleRows.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div>
                   <div className="text-sm font-semibold text-foreground">{r.title}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {CATEGORY_LABEL[r.category]} • {levelName(r.level_id)} • {className(r.class_id)}
+                    {CATEGORY_LABEL[r.category]} • {levelName(r.level_id)} • {chapterName(r.chapter_id)} • {className(r.class_id)}
                     {r.file_size ? ` • ${formatSize(r.file_size)}` : ""}
                     {r.teacher_id === teacherId ? "" : " • ملف أستاذ آخر"}
                   </div>
@@ -230,6 +272,7 @@ export function TeacherResources({
                           setTitle(r.title);
                           setLevelId(r.level_id ?? "");
                           setClassId(r.class_id ?? "");
+                          setChapterId(r.chapter_id ?? "");
                           setCategory(r.category);
                           setFile(null);
                         }}

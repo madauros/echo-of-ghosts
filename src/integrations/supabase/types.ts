@@ -71,6 +71,41 @@ export type Database = {
           },
         ]
       }
+      chapters: {
+        Row: {
+          created_at: string
+          id: string
+          level_id: string
+          name: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level_id: string
+          name: string
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level_id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapters_level_id_fkey"
+            columns: ["level_id"]
+            isOneToOne: false
+            referencedRelation: "levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classes: {
         Row: {
           capacity: number | null
@@ -105,6 +140,85 @@ export type Database = {
             columns: ["level_id"]
             isOneToOne: false
             referencedRelation: "levels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evaluation_grades: {
+        Row: {
+          comment: string | null
+          created_at: string
+          evaluation_id: string
+          grade: number
+          id: string
+          student_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          evaluation_id: string
+          grade: number
+          id?: string
+          student_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          evaluation_id?: string
+          grade?: number
+          id?: string
+          student_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_grades_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      homework_status: {
+        Row: {
+          created_at: string
+          done: boolean
+          homework_id: string
+          id: string
+          student_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          done: boolean
+          homework_id: string
+          id?: string
+          student_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          done?: boolean
+          homework_id?: string
+          id?: string
+          student_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "homework_status_homework_id_fkey"
+            columns: ["homework_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_events"
             referencedColumns: ["id"]
           },
         ]
@@ -182,6 +296,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           class_id: string | null
           created_at: string
           email: string
@@ -194,6 +309,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          avatar_path?: string | null
           class_id?: string | null
           created_at?: string
           email: string
@@ -206,6 +322,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          avatar_path?: string | null
           class_id?: string | null
           created_at?: string
           email?: string
@@ -234,9 +351,120 @@ export type Database = {
           },
         ]
       }
+      question_answers: {
+        Row: {
+          body: string | null
+          created_at: string
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          question_id: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          question_id: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          question_id?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questions: {
+        Row: {
+          body: string | null
+          chapter_id: string | null
+          class_id: string
+          created_at: string
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          student_id: string
+          teacher_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          chapter_id?: string | null
+          class_id: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          student_id: string
+          teacher_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          chapter_id?: string | null
+          class_id?: string
+          created_at?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          student_id?: string
+          teacher_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "questions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       resources: {
         Row: {
           category: Database["public"]["Enums"]["resource_category"]
+          chapter_id: string | null
           class_id: string | null
           created_at: string
           description: string | null
@@ -252,6 +480,7 @@ export type Database = {
         }
         Insert: {
           category: Database["public"]["Enums"]["resource_category"]
+          chapter_id?: string | null
           class_id?: string | null
           created_at?: string
           description?: string | null
@@ -267,6 +496,7 @@ export type Database = {
         }
         Update: {
           category?: Database["public"]["Enums"]["resource_category"]
+          chapter_id?: string | null
           class_id?: string | null
           created_at?: string
           description?: string | null
@@ -281,6 +511,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "resources_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "resources_class_id_fkey"
             columns: ["class_id"]
@@ -469,6 +706,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      shares_class: {
+        Args: { _target: string; _viewer: string }
         Returns: boolean
       }
       teaches_student: {

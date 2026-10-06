@@ -40,6 +40,26 @@ export function StudentAgenda({
   const counts = useAgendaCounts(client, { classId }, dateKey, 0);
   const resources = useAttachedResources(client, rows);
 
+  const [className, setClassName] = useState<string>("");
+  useEffect(() => {
+    if (!classId) {
+      setClassName("");
+      return;
+    }
+    let active = true;
+    client
+      .from("classes")
+      .select("name")
+      .eq("id", classId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setClassName(data?.name ?? "");
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, classId]);
+
   return (
     <section className="text-start">
       <div className="rounded-2xl border border-border bg-gradient-to-l from-brand-green/10 via-card to-brand-red/10 p-4">
@@ -72,6 +92,7 @@ export function StudentAgenda({
               key={row.id}
               client={client}
               row={row}
+              className={className || undefined}
               {...(row.resource_id && resources[row.resource_id]
                 ? { resource: resources[row.resource_id] }
                 : {})}

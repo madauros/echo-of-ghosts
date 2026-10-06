@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Persist space sections through the shared useSpaceSection hook, scoped by account and space in sessionStorage, so reloads restore navigation without mixing accounts or browser tabs.
+- Load SpaceAuth profiles by user identity rather than session-object changes, so token refreshes do not unmount active views.

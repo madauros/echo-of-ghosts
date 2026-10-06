@@ -26,6 +26,7 @@ export function UsersPanel({ client }: { client: SupabaseClient<Database> }) {
   const [spaceFilter, setSpaceFilter] = useState<"all" | SpaceKey>("all");
   const [editing, setEditing] = useState<ProfileRow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
@@ -40,6 +41,16 @@ export function UsersPanel({ client }: { client: SupabaseClient<Database> }) {
     else {
       setError(null);
       setRows(p ?? []);
+      const paths = (p ?? []).map((r) => r.avatar_path).filter((x): x is string => !!x);
+      if (paths.length > 0) {
+        const { data: signed } = await client.storage.from("avatars").createSignedUrls(paths, 3600);
+        const map: Record<string, string> = {};
+        for (const r of p ?? []) {
+          const hit = signed?.find((s) => s.path === r.avatar_path);
+          if (hit?.signedUrl) map[r.id] = hit.signedUrl;
+        }
+        setAvatarUrls(map);
+      } else setAvatarUrls({});
       setLevels(lv ?? []);
       setClasses(cl ?? []);
       setTeacherClasses(tc ?? []);
@@ -163,12 +174,17 @@ export function UsersPanel({ client }: { client: SupabaseClient<Database> }) {
                     levels={levels}
                     classes={classes}
                     teacherClassIds={teacherClassIdsOf(r.id)}
+                    client={client}
+                    avatarUrl={avatarUrls[r.id]}
+                    onAvatarChanged={load}
                     busy={busy}
                     onCancel={() => setEditing(null)}
                     onSave={save}
                   />
                 ) : (
                   <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                    <Avatar url={avatarUrls[r.id]} label={r.full_name || r.email} />
                     <div>
                       <div className="text-sm font-semibold text-foreground">
                         {r.full_name || <span dir="ltr">{r.email}</span>}
@@ -200,6 +216,7 @@ export function UsersPanel({ client }: { client: SupabaseClient<Database> }) {
                         ) : null}
                       </div>
                     </div>
+                    </div>
                     <div className="flex gap-2">
                       <button type="button" className="btn-text" onClick={() => setEditing(r)}>
                         تعديل
@@ -219,7 +236,23 @@ export function UsersPanel({ client }: { client: SupabaseClient<Database> }) {
   );
 }
 
+function Avatar({ url, label, size = 40 }: { url?: string | undefined; label: string; size?: number }) {
+  return url ? (
+    <img src={url} alt={label} style={{ width: size, height: size }} className="shrink-0 rounded-full border border-border object-cover" />
+  ) : (
+    <div
+      style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-full border border-border bg-muted text-sm font-semibold text-muted-foreground"
+    >
+      {label.trim().charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 function UserEditor({
+  client,
+  avatarUrl,
+  onAvatarChanged,
   row,
   levels,
   classes,
@@ -235,7 +268,48 @@ function UserEditor({
   busy: boolean;
   onCancel: () => void;
   onSave: (patch: Partial<ProfileRow>, teacherClassIds?: string[]) => Promise<void>;
+  client: SupabaseClient<Database>;
+  avatarUrl?: string | undefined;
+  onAvatarChanged: () => Promise<void>;
 }) {
+  const [avBusy, setAvBusy] = useState(false);
+  const [avMsg, setAvMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [preview, setPreview] = useState<string | undefined>(avatarUrl);
+  const uploadAvatar = async (file: File) => {
+    if (!file.type.startsWith("image/")) return setAvMsg({ ok: false, text: "يجب اختيار صورة." });
+    if (file.size > 5 * 1024 * 1024) return setAvMsg({ ok: false, text: "الحد الأقصى 5 ميغابايت." });
+    setAvBusy(true);
+    setAvMsg(null);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${row.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await client.storage.from("avatars").upload(path, file, { contentType: file.type });
+    if (upErr) {
+      setAvMsg({ ok: false, text: "تعذّر رفع الصورة." });
+      setAvBusy(false);
+      return;
+    }
+    const { error: dbErr } = await client.from("profiles").update({ avatar_path: path }).eq("id", row.id);
+    if (dbErr) setAvMsg({ ok: false, text: "تعذّر حفظ الصورة." });
+    else {
+      if (row.avatar_path) await client.storage.from("avatars").remove([row.avatar_path]);
+      setPreview(URL.createObjectURL(file));
+      setAvMsg({ ok: true, text: "تم تحديث الصورة." });
+      void onAvatarChanged();
+    }
+    setAvBusy(false);
+  };
+  const removeAvatar = async () => {
+    if (!row.avatar_path) return;
+    setAvBusy(true);
+    const { error: dbErr } = await client.from("profiles").update({ avatar_path: null }).eq("id", row.id);
+    if (!dbErr) {
+      await client.storage.from("avatars").remove([row.avatar_path]);
+      setPreview(undefined);
+      setAvMsg({ ok: true, text: "تم حذف الصورة." });
+      void onAvatarChanged();
+    } else setAvMsg({ ok: false, text: "تعذّر حذف الصورة." });
+    setAvBusy(false);
+  };
   const [fullName, setFullName] = useState(row.full_name ?? "");
   const [space, setSpace] = useState(row.space);
   const [status, setStatus] = useState(row.status);
@@ -317,8 +391,35 @@ function UserEditor({
         );
       }}
     >
-      <div className="text-xs text-muted-foreground sm:col-span-3" dir="ltr">
-        {row.email}
+      <div className="flex flex-wrap items-center gap-4 sm:col-span-3">
+        <Avatar url={preview} label={row.full_name || row.email} size={64} />
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground" dir="ltr">{row.email}</span>
+          <div className="flex flex-wrap gap-2">
+            <label className="btn-text cursor-pointer">
+              {avBusy ? "جارٍ الرفع…" : "رفع صورة الملف الشخصي"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={avBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void uploadAvatar(f);
+                }}
+              />
+            </label>
+            {preview ? (
+              <button type="button" className="btn-text" disabled={avBusy} onClick={() => void removeAvatar()}>
+                حذف الصورة
+              </button>
+            ) : null}
+          </div>
+          {avMsg ? (
+            <span className={`text-xs ${avMsg.ok ? "text-muted-foreground" : "text-destructive"}`}>{avMsg.text}</span>
+          ) : null}
+        </div>
       </div>
       <input
         className="field-input"

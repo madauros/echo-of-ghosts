@@ -30,7 +30,7 @@ export function shiftDay(key: string, days: number) {
 export function formatDayLabel(key: string) {
   const [y, m, d] = key.split("-").map(Number);
   const date = new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
-  return date.toLocaleDateString("ar-MA", {
+  return date.toLocaleDateString("ar-DZ", {
     weekday: "long",
     day: "numeric",
     month: "long",
