@@ -7,9 +7,14 @@ import { SpaceAuth, Wordmark } from "@/components/SpaceAuth";
 import { TeacherResources } from "@/components/resources/TeacherResources";
 import { TeacherSubmissions } from "@/components/resources/TeacherSubmissions";
 import { TeacherAgenda } from "@/components/agenda/TeacherAgenda";
+import { QuestionsSpace } from "@/components/questions/QuestionsSpace";
+import { TeacherEvaluations } from "@/components/grades/Grades";
+import { TeacherHomeworks } from "@/components/grades/Homework";
+import { ClassStudents } from "@/components/students/ClassStudents";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { useNotifications } from "@/components/resources/useSubmissions";
 import { STATUS_LABEL } from "@/lib/spaces";
+import { useSpaceSection } from "@/hooks/useSpaceSection";
 
 export const Route = createFileRoute("/taleem")({
   ssr: false,
@@ -26,13 +31,13 @@ export const Route = createFileRoute("/taleem")({
   component: Page,
 });
 
-type Tab = "resources" | "agenda" | "answers" | "notifications" | "account";
+type Tab = "resources" | "agenda" | "evaluations" | "questions" | "answers" | "students" | "notifications" | "account";
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 
 function Page() {
   return (
     <SpaceAuth space="taleem">
-      {({ session, profile, client, signOut }) => (
+      {({ session, profile, client, signOut, isAdmin }) => (
         <TeacherShell
           client={client}
           userId={session.user.id}
@@ -40,6 +45,7 @@ function Page() {
           name={profile.full_name?.trim() || session.user.email?.split("@")[0] || "أستاذ(ة)"}
           status={profile.status}
           signOut={signOut}
+          isAdmin={isAdmin}
         />
       )}
     </SpaceAuth>
@@ -53,6 +59,7 @@ function TeacherShell({
   name,
   status,
   signOut,
+  isAdmin,
 }: {
   client: SupabaseClient<Database>;
   userId: string;
@@ -60,14 +67,20 @@ function TeacherShell({
   name: string;
   status: string;
   signOut: () => Promise<void>;
+  isAdmin: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>("resources");
+  const [tab, setTab] = useSpaceSection<Tab>("taleem", userId, "resources", ["resources", "agenda", "evaluations", "questions", "answers", "students", "notifications", "account"]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const notifications = useNotifications(client, userId);
 
   useEffect(() => {
     let active = true;
     (async () => {
+      if (isAdmin) {
+        const { data } = await client.from("classes").select("*").order("name");
+        if (active) setClasses(data ?? []);
+        return;
+      }
       const { data: links } = await client
         .from("teacher_classes")
         .select("class_id")
@@ -83,12 +96,15 @@ function TeacherShell({
     return () => {
       active = false;
     };
-  }, [client, userId]);
+  }, [client, userId, isAdmin]);
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: "resources", label: "الدروس والتمارين" },
     { key: "agenda", label: "المفكرة" },
+    { key: "evaluations", label: "التقييمات" },
+    { key: "questions", label: "الأسئلة والأجوبة" },
     { key: "answers", label: "أجوبة التلاميذ" },
+    { key: "students", label: "قائمة التلاميذ" },
     { key: "notifications", label: "الإشعارات", badge: notifications.unread },
     { key: "account", label: "حسابي" },
   ];
@@ -128,8 +144,24 @@ function TeacherShell({
           <TeacherResources client={client} teacherId={userId} />
         ) : tab === "agenda" ? (
           <TeacherAgenda client={client} teacherId={userId} classes={classes} />
+            ) : tab === "evaluations" ? (
+          <div className="space-y-6">
+            <TeacherEvaluations client={client} classes={classes} />
+            <TeacherHomeworks client={client} classes={classes} />
+          </div>
+        ) : tab === "questions" ? (
+          <QuestionsSpace
+            client={client}
+            userId={userId}
+            userName={name}
+            role="teacher"
+            isAdmin={isAdmin}
+            classes={classes}
+          />
         ) : tab === "answers" ? (
           <TeacherSubmissions client={client} teacherId={userId} classes={classes} />
+        ) : tab === "students" ? (
+         <ClassStudents client={client} classes={classes} isAdmin={isAdmin} teacherId={userId} />
         ) : tab === "notifications" ? (
           <NotificationsPanel
             rows={notifications.rows}

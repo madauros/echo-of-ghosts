@@ -5,7 +5,6 @@ import { getSpaceClient, type SpaceKey } from "@/lib/spaces";
 const SPACE_ITEMS: { to: string; label: string; hint: string }[] = [
   { to: "/", label: "فضاء التلاميذ", hint: "talameed" },
   { to: "/taleem", label: "فضاء الأساتذة", hint: "taleem" },
-  { to: "/admin", label: "فضاء الإدارة", hint: "admin" },
 ];
 
 interface Props {

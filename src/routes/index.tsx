@@ -37,10 +37,6 @@ function Index() {
           <Link to="/taleem" className="underline underline-offset-4 hover:text-foreground">
             وصول الأساتذة
           </Link>
-          <span className="text-border">|</span>
-          <Link to="/admin" className="underline underline-offset-4 hover:text-foreground">
-            وصول الإدارة
-          </Link>
         </div>
       </main>
     </PublicBackdrop>

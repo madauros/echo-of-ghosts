@@ -247,6 +247,7 @@ export function TeacherAgenda({
               key={row.id}
               client={client}
               row={row}
+              className={classes.find((c) => c.id === row.class_id)?.name}
               {...(row.resource_id && resources[row.resource_id]
                 ? { resource: resources[row.resource_id] }
                 : {})}
