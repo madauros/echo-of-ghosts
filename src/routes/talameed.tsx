@@ -76,7 +76,7 @@ function StudentShell({
   const tour = useTourEligible(userId);
   const tourSteps: TourStep<Tab>[] = [
     { key: "resources", title: "الدروس والتمارين", text: "هنا تجد دروس وتمارين قسمك مرتبة حسب المحاور، ويمكنك إرسال أجوبتك." },
-    { key: "agenda", title: "المفكرة", text: "تابع مواعيد الواجبات المنزلية والتقييمات التي يبرمجها أساتذتك." },
+    { key: "agenda", title: "المذكرة", text: "تابع مواعيد الواجبات المنزلية والتقييمات التي يبرمجها أساتذتك." },
     { key: "grades", title: "المراقبة المستمرة", text: "اطّلع على نقاطك وتقييماتك." },
     { key: "questions", title: "الأسئلة والأجوبة", text: "اطرح سؤالك على أستاذ قسمك بملف، وشاهد أسئلة زملائك وأجوبة الأستاذ." },
     { key: "answers", title: "أجوبتي", text: "راجع الأجوبة التي أرسلتها وتصحيحها." },
@@ -105,7 +105,7 @@ function StudentShell({
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: "resources", label: "الدروس والتمارين" },
-    { key: "agenda", label: "المفكرة" },
+    { key: "agenda", label: "المذكرة" },
     { key: "grades", label: "المراقبة المستمرة" },
     { key: "questions", label: "الأسئلة والأجوبة" },
     { key: "answers", label: "أجوبتي" },

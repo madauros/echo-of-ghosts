@@ -179,7 +179,7 @@ export function TeacherHomeworks({ client, classes }: { client: Client; classes:
       <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
         <BookCheck size={18} /> الواجبات المنزلية
       </h2>
-      <p className="mt-1 text-sm text-muted-foreground">الواجبات المُنشأة من المفكرة. حدّد الإنجاز من قائمة التلاميذ.</p>
+      <p className="mt-1 text-sm text-muted-foreground">الواجبات المُنشأة من المذكرة. حدّد الإنجاز من قائمة التلاميذ.</p>
       {loading ? (
         <p className="mt-6 text-sm text-muted-foreground">جارٍ التحميل…</p>
       ) : rows.length === 0 ? (

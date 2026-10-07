@@ -10,7 +10,7 @@ export type GradeRow = Database["public"]["Tables"]["evaluation_grades"]["Row"];
 
 const fmt = (n: number) => Number(n).toLocaleString("ar-MA", { maximumFractionDigits: 2 });
 
-/** Evaluations (from المفكرة) for the given classes. */
+/** Evaluations (from المذكرة) for the given classes. */
 export function useEvaluations(client: Client, classIds: string[], version = 0) {
   const [rows, setRows] = useState<AgendaRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,13 +85,13 @@ export function TeacherEvaluations({ client, classes }: { client: Client; classe
         <ClipboardCheck size={18} /> التقييمات
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        التقييمات المُنشأة من المفكرة. أضف النقط من قائمة التلاميذ.
+        التقييمات المُنشأة من المذكرة. أضف النقط من قائمة التلاميذ.
       </p>
       {loading ? (
         <p className="mt-6 text-sm text-muted-foreground">جارٍ التحميل…</p>
       ) : rows.length === 0 ? (
         <p className="mt-6 rounded-2xl border border-dashed border-border bg-card/60 px-6 py-10 text-center text-sm text-muted-foreground">
-          لا توجد تقييمات بعد. أنشئ تقييماً من المفكرة.
+          لا توجد تقييمات بعد. أنشئ تقييماً من المذكرة.
         </p>
       ) : (
         <ul className="mt-6 space-y-3">

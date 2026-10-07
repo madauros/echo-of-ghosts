@@ -100,7 +100,7 @@ function TeacherShell({
 
   const tabs: { key: Tab; label: string; badge?: number }[] = [
     { key: "resources", label: "الدروس والتمارين" },
-    { key: "agenda", label: "المفكرة" },
+    { key: "agenda", label: "المذكرة" },
     { key: "evaluations", label: "التقييمات" },
     { key: "questions", label: "الأسئلة والأجوبة" },
     { key: "answers", label: "أجوبة التلاميذ" },
