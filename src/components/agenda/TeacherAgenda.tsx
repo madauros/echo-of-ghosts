@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { CATEGORY_LABEL, useResourceList } from "@/components/resources/useResources";
 import { AgendaCalendar, formatDayLabelAr } from "./AgendaCalendar";
+import { LessonLog } from "./LessonLog";
 import { AgendaCard, useAgendaCounts, useAttachedResources } from "./agendaShared";
 import {
   AGENDA_KIND_LABEL,
@@ -166,6 +167,8 @@ export function TeacherAgenda({
       <div className="mt-4">
         <AgendaCalendar value={dateKey} onChange={navigate} counts={counts} />
       </div>
+
+      <LessonLog client={client} teacherId={teacherId} classes={classes} dateKey={dateKey} />
 
       <div className="mt-4">
         <select className="field-input" value={classId} onChange={(e) => setClassId(e.target.value)}>
