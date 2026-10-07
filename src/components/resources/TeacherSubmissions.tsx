@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { Butterfly } from "@/components/Butterfly";
-import { formatSize } from "./useResources";
 import { formatDate, notify, openSubmission, useSubmissions, type SubmissionItem } from "./useSubmissions";
 
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -153,7 +152,6 @@ export function TeacherSubmissions({
                   <div className="text-sm font-semibold text-foreground">{row.resource_title}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {row.student_name} • {className(row.class_id)} • {formatDate(row.created_at)}
-                    {row.file_size ? ` • ${formatSize(row.file_size)}` : ""}
                   </div>
                 </div>
                 <div className="flex gap-2">

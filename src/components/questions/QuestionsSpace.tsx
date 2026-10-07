@@ -5,7 +5,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { Butterfly } from "@/components/Butterfly";
 import { checkSubmissionFile, SUBMISSION_ACCEPT } from "@/lib/safeFile";
 import { formatDate, notify } from "@/components/resources/useSubmissions";
-import { formatSize, useChapters } from "@/components/resources/useResources";
+import { useChapters } from "@/components/resources/useResources";
 import {
   openQuestionFile,
   uploadQuestionFile,
@@ -290,7 +290,6 @@ function FileChip({
     <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-xs">
       <Paperclip size={14} className="text-primary" />
       <span className="font-semibold text-foreground">{row.file_name}</span>
-      {row.file_size ? <span className="text-muted-foreground">{formatSize(row.file_size)}</span> : null}
       <button type="button" className="btn-text" onClick={() => open(false)}>
         عرض
       </button>

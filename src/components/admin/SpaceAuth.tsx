@@ -67,6 +67,17 @@ export function SpaceAuth({ space, children }: Props) {
   }, [client, session]);
 
   const signOut = async () => {
+    try {
+      // Forget the last open section so the next login starts on the first one.
+      const stale: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith("navigation:section:")) stale.push(k);
+      }
+      stale.forEach((k) => sessionStorage.removeItem(k));
+    } catch {
+      // Storage unavailable: nothing to clear.
+    }
     await client.auth.signOut();
     setSession(null);
     setProfile(null);

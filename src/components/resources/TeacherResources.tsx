@@ -4,7 +4,6 @@ import type { Database } from "@/integrations/supabase/types";
 import {
   ACCEPTED,
   CATEGORY_LABEL,
-  formatSize,
   isAccepted,
   openResource,
   useLevels,
@@ -251,7 +250,6 @@ export function TeacherResources({
                   <div className="text-sm font-semibold text-foreground">{r.title}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {CATEGORY_LABEL[r.category]} • {levelName(r.level_id)} • {chapterName(r.chapter_id)} • {className(r.class_id)}
-                    {r.file_size ? ` • ${formatSize(r.file_size)}` : ""}
                     {r.teacher_id === teacherId ? "" : " • ملف أستاذ آخر"}
                   </div>
                 </div>
