@@ -223,6 +223,50 @@ export type Database = {
           },
         ]
       }
+      lesson_logs: {
+        Row: {
+          class_id: string
+          content: string
+          created_at: string
+          end_time: string
+          id: string
+          log_date: string
+          start_time: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          class_id: string
+          content: string
+          created_at?: string
+          end_time: string
+          id?: string
+          log_date: string
+          start_time: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Update: {
+          class_id?: string
+          content?: string
+          created_at?: string
+          end_time?: string
+          id?: string
+          log_date?: string
+          start_time?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_logs_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       levels: {
         Row: {
           code: string | null
