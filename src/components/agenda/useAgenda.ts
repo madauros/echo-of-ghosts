@@ -40,22 +40,22 @@ export function formatDayLabel(key: string) {
 
 /**
  * Turns a PostgREST error into an actionable Arabic message.
- * The generic "تعذّر تحميل المفكرة" hid the real cause (missing table on the
+ * The generic "تعذّر تحميل المذكرة" hid the real cause (missing table on the
  * external database, or a permission problem), so we surface it explicitly.
  */
 export function describeAgendaError(err: { code?: string; message?: string } | null): string {
   const code = err?.code ?? "";
   const message = err?.message ?? "";
   if (code === "42P01" || code === "PGRST205" || /agenda_events.*(not exist|not find|schema cache)/i.test(message)) {
-    return "تعذّر تحميل المفكرة: جدول المفكرة غير موجود في قاعدة البيانات. نفّذ ملف supabase/setup-external.sql.";
+    return "تعذّر تحميل المذكرة: جدول المذكرة غير موجود في قاعدة البيانات. نفّذ ملف supabase/setup-external.sql.";
   }
   if (code === "42501" || code === "PGRST301" || /permission denied/i.test(message)) {
-    return "تعذّر تحميل المفكرة: ليست لديك صلاحية قراءة المفكرة.";
+    return "تعذّر تحميل المذكرة: ليست لديك صلاحية قراءة المذكرة.";
   }
   if (code === "42703" || /column .* does not exist/i.test(message)) {
-    return "تعذّر تحميل المفكرة: بنية جدول المفكرة قديمة. نفّذ ملف supabase/setup-external.sql.";
+    return "تعذّر تحميل المذكرة: بنية جدول المذكرة قديمة. نفّذ ملف supabase/setup-external.sql.";
   }
-  return "تعذّر تحميل المفكرة.";
+  return "تعذّر تحميل المذكرة.";
 }
 
 export function useAgenda(
