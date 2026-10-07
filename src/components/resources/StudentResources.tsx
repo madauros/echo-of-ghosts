@@ -6,7 +6,6 @@ import { SUBMISSION_ACCEPT } from "@/lib/safeFile";
 import { submitAnswer } from "./submitAnswer";
 import {
   CATEGORY_LABEL,
-  formatSize,
   openResource,
   useLevels,
   useResourceList,
@@ -253,10 +252,6 @@ export function StudentResources({
                     >
                       <div>
                         <div className="text-sm font-semibold text-foreground">{r.title}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {r.mime_type === "application/pdf" ? "PDF" : "صورة"}
-                          {r.file_size ? ` • ${formatSize(r.file_size)}` : ""}
-                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button type="button" className="btn-text" onClick={() => open(r, false)}>
