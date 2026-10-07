@@ -29,6 +29,13 @@
       "when": 1791308840426,
       "tag": "0003_upstream_questions_chapters_avatars_homework_grades",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791351124835,
+      "tag": "0004_lesson_logs",
+      "breakpoints": true
     }
   ]
 }
