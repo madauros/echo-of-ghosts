@@ -1,4 +1,5 @@
 # Roadmap
+- [ ] Correct overlapping Arabic text in lesson-log PDF exports and visually verify the generated pages
 - [x] Persist the open section in student, teacher and administration spaces across reloads and tab focus changes
 - [x] Hide administration links from navigation and page footers while keeping /admin directly accessible
 - [x] Recreate agenda module from friendly-ghost-importer (useAgenda, agendaShared, AgendaCalendar, StudentAgenda, TeacherAgenda + deps)
