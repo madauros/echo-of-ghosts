@@ -7,14 +7,14 @@ type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 type LogRow = Database["public"]["Tables"]["lesson_logs"]["Row"];
 
 const esc = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 const short = (t: string) => t.slice(0, 5);
 const fmtDay = (d: string) =>
   new Date(`${d}T12:00:00`).toLocaleDateString("ar-DZ", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
 function monthBounds(dateKey: string) {
   const [y, m] = dateKey.split("-").map(Number);
-  const last = new Date(y!, m!, 0).getDate();
+   const last = new Date(y ?? 2026, m ?? 1, 0).getDate();
   const mm = String(m).padStart(2, "0");
   return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, "0")}` };
 }
@@ -46,7 +46,7 @@ function buildHtml(
           (r) => `
         <article class="entry">
           <div class="time"><b>${short(r.start_time)}</b><span>${short(r.end_time)}</span></div>
-          <div class="body"><span class="tag">${esc(cls(r.class_id))}</span><p>${esc(r.content)}</p></div>
+          <div class="body"><span class="tag" dir="auto">${esc(cls(r.class_id))}</span><p dir="rtl">${esc(r.content)}</p></div>
         </article>`,
         )
         .join("")}
@@ -74,13 +74,13 @@ function buildHtml(
   .day h2 { font-size: 12.5pt; color: #14532d; margin: 0 0 8px; padding-bottom: 5px;
     border-bottom: 2px solid #c9a227; display: flex; align-items: center; gap: 8px; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: #c9a227; display: inline-block; }
-  .entry { display: flex; gap: 12px; margin-bottom: 8px; }
+  .entry { display: flex; align-items: stretch; gap: 12px; margin-bottom: 8px; break-inside: avoid; }
   .time { width: 68px; flex-shrink: 0; text-align: center; border-radius: 8px; background: #e8f3ec;
     color: #14532d; padding: 8px 4px; direction: ltr; }
   .time b { display: block; font-size: 12pt; } .time span { font-size: 9pt; }
-  .body { flex: 1; border: 1px solid #e3e8e4; border-right: 4px solid #1f7a4a; border-radius: 8px; padding: 8px 12px; }
-  .tag { font-size: 15pt; font-weight: 700; background: #fbf4dc; color: #8a6d12; padding: 6px 20px; border-radius: 99px; }
-  .body p { margin: 6px 0 0; white-space: pre-wrap; line-height: 1.7; }
+  .body { flex: 1; min-width: 0; border: 1px solid #e3e8e4; border-right: 4px solid #1f7a4a; border-radius: 8px; padding: 8px 12px; }
+  .tag { display: inline-block; font-size: 15pt; font-weight: 700; line-height: 1.5; background: #fbf4dc; color: #8a6d12; padding: 6px 20px; border-radius: 99px; }
+  .body p { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; text-align: right; line-height: 1.9; letter-spacing: 0; }
   .empty { text-align: center; color: #6b7a71; padding: 40px; }
   footer { margin-top: 24px; display: flex; justify-content: space-between; font-size: 9pt; color: #6b7a71;
     border-top: 1px solid #e3e8e4; padding-top: 8px; }
@@ -166,35 +166,33 @@ export function LessonLogPdfButton({
       iframe.style.height = "1123px";
       document.body.appendChild(iframe);
       try {
-        const doc = iframe.contentDocument!;
+        const doc = iframe.contentDocument;
+        if (!doc) throw new Error("PDF document unavailable");
         doc.open();
         doc.write(html);
         doc.close();
-        await (iframe.contentWindow as Window & { document: Document }).document.fonts.ready;
-        await new Promise((r) => setTimeout(r, 400));
-        iframe.style.height = `${doc.body.scrollHeight}px`;
-
-        // html2canvas draws the iframe content using the *main* document's fonts:
-        // load the Arabic fonts here too, otherwise Arabic falls back and breaks.
-        if (!document.getElementById("lesson-pdf-fonts")) {
-          const link = document.createElement("link");
-          link.id = "lesson-pdf-fonts";
-          link.rel = "stylesheet";
-          link.href =
-            "https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap";
-          document.head.appendChild(link);
+        const stylesheet = doc.querySelector<HTMLLinkElement>('link[rel="stylesheet"]');
+        if (stylesheet && !stylesheet.sheet) {
+          await new Promise<void>((resolve, reject) => {
+            stylesheet.onload = () => resolve();
+            stylesheet.onerror = () => reject(new Error("PDF fonts unavailable"));
+          });
         }
         await Promise.all([
-          document.fonts.load('400 16px "Cairo"'),
-          document.fonts.load('600 16px "Cairo"'),
-          document.fonts.load('700 16px "Cairo"'),
-          document.fonts.load('400 16px "Amiri"'),
-          document.fonts.load('700 16px "Amiri"'),
+          doc.fonts.load('400 16px "Cairo"'),
+          doc.fonts.load('600 16px "Cairo"'),
+          doc.fonts.load('700 16px "Cairo"'),
+          doc.fonts.load('400 16px "Amiri"'),
+          doc.fonts.load('700 16px "Amiri"'),
         ]);
-        await document.fonts.ready;
+        await doc.fonts.ready;
+        iframe.style.height = `${doc.body.scrollHeight}px`;
 
-        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-        const canvas = await html2canvas(doc.body, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        // Let the browser shape whole Arabic lines (including mixed numerals).
+        // html2canvas paints individual runs and can overlap RTL glyphs.
+        const [{ toCanvas, getFontEmbedCSS }, { jsPDF }] = await Promise.all([import("html-to-image"), import("jspdf")]);
+        const fontEmbedCSS = await getFontEmbedCSS(doc.body);
+        const canvas = await toCanvas(doc.body, { pixelRatio: 2, fontEmbedCSS, backgroundColor: "#ffffff" });
         const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
         const pageW = pdf.internal.pageSize.getWidth();
         const pageH = pdf.internal.pageSize.getHeight();
@@ -207,7 +205,8 @@ export function LessonLogPdfButton({
           const slice = document.createElement("canvas");
           slice.width = canvas.width;
           slice.height = Math.ceil(sliceH);
-          const ctx = slice.getContext("2d")!;
+          const ctx = slice.getContext("2d");
+          if (!ctx) throw new Error("PDF canvas unavailable");
           ctx.fillStyle = "#ffffff";
           ctx.fillRect(0, 0, slice.width, slice.height);
           ctx.drawImage(canvas, 0, rendered, canvas.width, sliceH, 0, 0, canvas.width, sliceH);

@@ -11,3 +11,4 @@
 
 - Persist space sections through the shared useSpaceSection hook, scoped by account and space in sessionStorage, so reloads restore navigation without mixing accounts or browser tabs.
 - Load SpaceAuth profiles by user identity rather than session-object changes, so token refreshes do not unmount active views.
+- Render lesson-log PDFs with browser-shaped HTML and embedded fonts via html-to-image, rather than html2canvas text runs, to preserve Arabic and mixed-direction text.
