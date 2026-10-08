@@ -123,6 +123,7 @@ export function LessonLogPdfButton({
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(init.from);
   const [to, setTo] = useState(init.to);
+  const [classId, setClassId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,15 +132,17 @@ export function LessonLogPdfButton({
     setError(null);
     setBusy(true);
     try {
+      let query = client
+        .from("lesson_logs")
+        .select("*")
+        .eq("teacher_id", teacherId)
+        .gte("log_date", from)
+        .lte("log_date", to)
+        .order("log_date")
+        .order("start_time");
+      if (classId) query = query.eq("class_id", classId);
       const [logsRes, profileRes, levelsRes] = await Promise.all([
-        client
-          .from("lesson_logs")
-          .select("*")
-          .eq("teacher_id", teacherId)
-          .gte("log_date", from)
-          .lte("log_date", to)
-          .order("log_date")
-          .order("start_time"),
+        query,
         client.from("profiles").select("full_name").eq("id", teacherId).maybeSingle(),
         client.from("levels").select("id, name"),
       ]);
@@ -147,11 +150,12 @@ export function LessonLogPdfButton({
       const rows = logsRes.data ?? [];
       const name = teacherName || profileRes.data?.full_name?.trim() || "";
       const levelById = new Map((levelsRes.data ?? []).map((l) => [l.id, l.name]));
+      const scopeClasses = classId ? classes.filter((c) => c.id === classId) : classes;
       const levelNames = [
-        ...new Set(classes.map((c) => (c.level_id ? levelById.get(c.level_id) : undefined)).filter(Boolean)),
+        ...new Set(scopeClasses.map((c) => (c.level_id ? levelById.get(c.level_id) : undefined)).filter(Boolean)),
       ] as string[];
 
-      const html = buildHtml(rows, classes, from, to, name, levelNames);
+      const html = buildHtml(rows, scopeClasses, from, to, name, levelNames);
 
       // Render the document off-screen, capture it, then save a real PDF file.
       const iframe = document.createElement("iframe");
@@ -212,7 +216,8 @@ export function LessonLogPdfButton({
           rendered += sliceH;
           page += 1;
         }
-        pdf.save(`دفتر-الدروس-${from}_${to}.pdf`);
+        const clsName = classId ? `-${classes.find((c) => c.id === classId)?.name ?? ""}` : "";
+        pdf.save(`دفتر-الدروس${clsName}-${from}_${to}.pdf`);
       } finally {
         iframe.remove();
       }
@@ -232,6 +237,12 @@ export function LessonLogPdfButton({
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background/70 p-2 text-sm">
           <label className="flex items-center gap-1">من <input type="date" className="field-input" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
           <label className="flex items-center gap-1">إلى <input type="date" className="field-input" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          <select className="field-input" value={classId} onChange={(e) => setClassId(e.target.value)}>
+            <option value="">كل الأقسام</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
           <button type="button" className="btn-primary" disabled={busy} onClick={() => void generate()}>
             {busy ? "…" : "إنشاء"}
           </button>
