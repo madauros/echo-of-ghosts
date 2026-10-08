@@ -123,6 +123,7 @@ export function LessonLogPdfButton({
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(init.from);
   const [to, setTo] = useState(init.to);
+  const [classId, setClassId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,15 +132,17 @@ export function LessonLogPdfButton({
     setError(null);
     setBusy(true);
     try {
+      let query = client
+        .from("lesson_logs")
+        .select("*")
+        .eq("teacher_id", teacherId)
+        .gte("log_date", from)
+        .lte("log_date", to)
+        .order("log_date")
+        .order("start_time");
+      if (classId) query = query.eq("class_id", classId);
       const [logsRes, profileRes, levelsRes] = await Promise.all([
-        client
-          .from("lesson_logs")
-          .select("*")
-          .eq("teacher_id", teacherId)
-          .gte("log_date", from)
-          .lte("log_date", to)
-          .order("log_date")
-          .order("start_time"),
+        query,
         client.from("profiles").select("full_name").eq("id", teacherId).maybeSingle(),
         client.from("levels").select("id, name"),
       ]);
