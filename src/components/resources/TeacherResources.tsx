@@ -54,6 +54,25 @@ export function TeacherResources({
     setError(null);
 
     if (editing) {
+      let fileFields: { file_path: string; file_name: string; mime_type: string; file_size: number } | null = null;
+      if (file) {
+        if (!isAccepted(file)) {
+          setError("الملفات المقبولة: PDF أو صورة فقط.");
+          setBusy(false);
+          return;
+        }
+        const ext = (file.name.includes(".") ? file.name.split(".").pop() : "bin") || "bin";
+        const newPath = `${teacherId}/${category}/${crypto.randomUUID()}.${ext.toLowerCase()}`;
+        const { error: upErr } = await client.storage
+          .from("resources")
+          .upload(newPath, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        if (upErr) {
+          setError(`تعذّر رفع الملف: ${upErr.message}`);
+          setBusy(false);
+          return;
+        }
+        fileFields = { file_path: newPath, file_name: file.name, mime_type: file.type, file_size: file.size };
+      }
       const { error: err } = await client
         .from("resources")
         .update({
@@ -62,10 +81,15 @@ export function TeacherResources({
           class_id: classId === "" ? null : classId,
           chapter_id: chapterId === "" ? null : chapterId,
           category,
+          ...(fileFields ?? {}),
         })
         .eq("id", editing.id);
-      if (err) setError("تعذّر حفظ التعديل.");
-      else {
+      if (err) {
+        if (fileFields) await client.storage.from("resources").remove([fileFields.file_path]);
+        setError("تعذّر حفظ التعديل.");
+      } else {
+        // Homework (agenda_events) references the resource by id, so it now points to the new file.
+        if (fileFields) await client.storage.from("resources").remove([editing.file_path]);
         reset();
         await reload();
       }
@@ -203,14 +227,20 @@ export function TeacherResources({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-        {editing ? null : (
+        <label className="sm:col-span-2 flex flex-col gap-1">
+          {editing ? (
+            <span className="text-xs text-muted-foreground">
+              الملف الحالي: {editing.file_name} — اختر ملفاً جديداً لاستبداله (اختياري)
+            </span>
+          ) : null}
           <input
-            className="field-input sm:col-span-2"
+            key={editing?.id ?? "new"}
+            className="field-input"
             type="file"
             accept={ACCEPTED}
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
-        )}
+        </label>
         <div className="flex gap-2">
           <button type="submit" className="btn-primary" disabled={busy}>
             {busy ? "…" : editing ? "حفظ" : "رفع"}
