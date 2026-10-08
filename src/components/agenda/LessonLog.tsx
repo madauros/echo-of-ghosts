@@ -2,6 +2,7 @@ import { Clock, NotebookPen, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { LessonLogPdfButton } from "./LessonLogPdf";
 
 type LogRow = Database["public"]["Tables"]["lesson_logs"]["Row"];
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -116,11 +117,14 @@ export function LessonLog({
           <NotebookPen size={18} className="text-brand-green" /> متابعة العمل المنجز
           <span className="text-xs font-normal text-muted-foreground">(خاص بالأستاذ)</span>
         </h3>
+        <span className="flex flex-wrap items-start gap-2">
+        <LessonLogPdfButton client={client} teacherId={teacherId} classes={classes} dateKey={dateKey} />
         {!open ? (
           <button type="button" className="btn-primary inline-flex items-center gap-1" onClick={() => setOpen(true)}>
             <Plus size={16} /> إضافة متابعة
           </button>
         ) : null}
+        </span>
       </div>
 
       {open ? (
