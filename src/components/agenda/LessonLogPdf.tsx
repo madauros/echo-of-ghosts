@@ -26,6 +26,7 @@ function buildHtml(
   to: string,
   teacherName: string,
   levelNames: string[],
+  schoolName = "",
 ) {
   const byDay = new Map<string, LogRow[]>();
   rows.forEach((r) => byDay.set(r.log_date, [...(byDay.get(r.log_date) ?? []), r]));
@@ -63,6 +64,7 @@ function buildHtml(
     background: linear-gradient(135deg, #14532d 0%, #1f7a4a 60%, #c9a227 140%); position: relative; overflow: hidden; }
   header h1 { font-family: Amiri, serif; font-size: 28pt; margin: 0 0 4px; }
   header p { margin: 0 0 3px; opacity: .92; font-size: 11pt; }
+  header .school { font-size: 14pt; font-weight: 700; opacity: 1; margin-bottom: 6px; }
   header .teacher { font-family: Amiri, serif; font-size: 21pt; font-weight: 700; opacity: 1; margin: 12px 0 8px; line-height: 1.35; }
   header .teacher span { display: block; font-family: Cairo, sans-serif; font-size: 11pt; font-weight: 600; opacity: .85; margin-bottom: 2px; }
   header .classes { font-size: 15pt; font-weight: 700; opacity: 1; margin-top: 8px; }
@@ -88,7 +90,8 @@ function buildHtml(
   .sign div { width: 40%; border-top: 1px dashed #9aa79f; padding-top: 6px; text-align: center; }
 </style></head><body>
 <header>
-  <h1>دفتر الدروس</h1>
+  ${schoolName ? `<p class="school">${esc(schoolName)}</p>` : ""}
+  <h1>المذكرة</h1>
   ${teacherName ? `<p class="teacher"><span>الأستاذ(ة)</span>${esc(teacherName)}</p>` : ""}
   ${levelNames.length ? `<p>المستويات: ${esc(levelNames.join("، "))}</p>` : ""}
   ${usedClassNames.length ? `<p class="classes">الأقسام: ${esc(usedClassNames.join("، "))}</p>` : ""}
@@ -141,10 +144,11 @@ export function LessonLogPdfButton({
         .order("log_date")
         .order("start_time");
       if (classId) query = query.eq("class_id", classId);
-      const [logsRes, profileRes, levelsRes] = await Promise.all([
+      const [logsRes, profileRes, levelsRes, schoolRes] = await Promise.all([
         query,
         client.from("profiles").select("full_name").eq("id", teacherId).maybeSingle(),
         client.from("levels").select("id, name"),
+        (client as any).from("school_settings").select("name").maybeSingle(),
       ]);
       if (logsRes.error) return setError("تعذّر تحميل الحصص.");
       const rows = logsRes.data ?? [];
@@ -155,7 +159,7 @@ export function LessonLogPdfButton({
         ...new Set(scopeClasses.map((c) => (c.level_id ? levelById.get(c.level_id) : undefined)).filter(Boolean)),
       ] as string[];
 
-      const html = buildHtml(rows, scopeClasses, from, to, name, levelNames);
+      const html = buildHtml(rows, scopeClasses, from, to, name, levelNames, schoolRes.data?.name?.trim() ?? "");
 
       // Render the document off-screen, capture it, then save a real PDF file.
       const iframe = document.createElement("iframe");
