@@ -3,6 +3,7 @@ import { ClipboardCheck, GraduationCap, Plus } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { formatDayLabel, type AgendaRow } from "@/components/agenda/useAgenda";
+import { applyAgendaFilter, type AgendaFilter } from "@/components/grades/AgendaFilters";
 
 type Client = SupabaseClient<Database>;
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
@@ -43,12 +44,22 @@ export function useEvaluations(client: Client, classIds: string[], version = 0) 
 
 /* ------------------------------ Teacher side ------------------------------ */
 
-export function TeacherEvaluations({ client, classes }: { client: Client; classes: ClassRow[] }) {
+export function TeacherEvaluations({
+  client,
+  classes,
+  filter,
+}: {
+  client: Client;
+  classes: ClassRow[];
+  filter: AgendaFilter;
+}) {
   const classIds = useMemo(() => classes.map((c) => c.id), [classes]);
   const { rows, loading } = useEvaluations(client, classIds);
   const [grades, setGrades] = useState<GradeRow[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<string | null>(null);
+
+  const filtered = useMemo(() => applyAgendaFilter(rows, filter), [rows, filter]);
 
   useEffect(() => {
     if (rows.length === 0) {
@@ -93,9 +104,13 @@ export function TeacherEvaluations({ client, classes }: { client: Client; classe
         <p className="mt-6 rounded-2xl border border-dashed border-border bg-card/60 px-6 py-10 text-center text-sm text-muted-foreground">
           لا توجد تقييمات بعد. أنشئ تقييماً من المذكرة.
         </p>
+      ) : filtered.length === 0 ? (
+        <p className="mt-6 rounded-2xl border border-dashed border-border bg-card/60 px-6 py-10 text-center text-sm text-muted-foreground">
+          لا توجد تقييمات مطابقة لهذه التصفية.
+        </p>
       ) : (
         <ul className="mt-6 space-y-3">
-          {rows.map((r) => {
+          {filtered.map((r) => {
             const g = grades.filter((x) => x.evaluation_id === r.id);
             const avg = g.length ? g.reduce((s, x) => s + Number(x.grade), 0) / g.length : null;
             return (

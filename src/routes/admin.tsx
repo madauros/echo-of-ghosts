@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SpaceAuth, Wordmark } from "@/components/SpaceAuth";
 import { LevelsPanel } from "@/components/admin/LevelsPanel";
 import { ChaptersPanel } from "@/components/admin/ChaptersPanel";
+import { SchoolPanel } from "@/components/admin/SchoolPanel";
 import { ClassesPanel } from "@/components/admin/ClassesPanel";
 import { UsersPanel } from "@/components/admin/UsersPanel";
 import type { Database } from "@/integrations/supabase/types";
@@ -14,7 +15,7 @@ import { useSpaceSection } from "@/hooks/useSpaceSection";
 
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
-type Tab = "accounts" | "users" | "levels" | "chapters" | "classes";
+type Tab = "accounts" | "users" | "levels" | "chapters" | "classes" | "school";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "accounts", label: "المصادقة" },
@@ -22,6 +23,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "levels", label: "المستويات" },
   { key: "chapters", label: "البرنامج" },
   { key: "classes", label: "الأقسام" },
+  { key: "school", label: "المؤسسة" },
 ];
 
 
@@ -94,10 +96,24 @@ function AdminDashboard({
   return (
     <div className="min-h-screen bg-canvas">
       <header className="app-bar">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <Wordmark space="admin" />
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3">
+          <div className="min-w-0 shrink-0">
+            <Wordmark space="admin" />
+          </div>
 
-          <nav className="nav-menu order-3 w-full min-w-0 max-w-full justify-start lg:order-none lg:w-auto lg:justify-center" aria-label="القائمة">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="user-chip min-w-0 max-w-[40vw] sm:max-w-[16rem]" title={email}>
+              <span className="user-avatar" aria-hidden="true">
+                <UserRound size={18} />
+              </span>
+              <span className="truncate text-sm font-semibold text-foreground">{name}</span>
+            </div>
+            <button type="button" onClick={signOut} className="btn-text shrink-0 whitespace-nowrap">
+              تسجيل الخروج
+            </button>
+          </div>
+
+          <nav className="nav-menu w-full min-w-0 max-w-full justify-start sm:justify-center" aria-label="القائمة">
             {TABS.map((t) => (
               <button
                 key={t.key}
@@ -110,18 +126,6 @@ function AdminDashboard({
               </button>
             ))}
           </nav>
-
-          <div className="flex items-center gap-3">
-            <div className="user-chip" title={email}>
-              <span className="user-avatar" aria-hidden="true">
-                <UserRound size={18} />
-              </span>
-              <span className="text-sm font-semibold text-foreground">{name}</span>
-            </div>
-            <button type="button" onClick={signOut} className="btn-text">
-              تسجيل الخروج
-            </button>
-          </div>
         </div>
       </header>
 
@@ -131,6 +135,7 @@ function AdminDashboard({
         {tab === "levels" ? <LevelsPanel client={client} /> : null}
         {tab === "chapters" ? <ChaptersPanel client={client} /> : null}
         {tab === "classes" ? <ClassesPanel client={client} /> : null}
+        {tab === "school" ? <SchoolPanel client={client} /> : null}
       </main>
     </div>
   );
@@ -250,4 +255,3 @@ function AccountsPanel({ client }: { client: SupabaseClient<Database> }) {
     </section>
   );
 }
-
