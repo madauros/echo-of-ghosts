@@ -304,6 +304,7 @@ function QuestionCard({
   item,
   role,
   isAdmin,
+  showClass,
   className,
   chapterName,
   userId,
@@ -315,6 +316,7 @@ function QuestionCard({
   item: QuestionItem;
   role: "student" | "teacher";
   isAdmin: boolean;
+  showClass: boolean;
   className: string;
   chapterName: string;
   userId: string;
@@ -413,7 +415,7 @@ function QuestionCard({
           <div className="text-sm font-semibold text-foreground">{item.title}</div>
           <div className="mt-1 text-xs text-muted-foreground">
             {item.student_name} • {formatDate(item.created_at)} • {chapterName}
-            {isAdmin && className ? ` • ${className}` : ""}
+            {showClass && className ? ` • ${className}` : ""}
           </div>
         </div>
         {(role === "student" && item.student_id === userId) || isAdmin ? (
