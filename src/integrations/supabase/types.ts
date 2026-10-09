@@ -578,6 +578,30 @@ export type Database = {
           },
         ]
       }
+      school_settings: {
+        Row: {
+          address: string
+          id: boolean
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string
+          id?: boolean
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          id?: boolean
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       submission_comments: {
         Row: {
           author_id: string
