@@ -47,6 +47,31 @@ export function useAgendaMonths(client: Client, classIds: string[]): string[] {
   return months;
 }
 
+/** Trimester-only filter (student side). Empty value = العام الدراسي (whole year). */
+export function TrimesterFilterBar({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      className="field-input w-full text-sm sm:w-auto"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label="تصفية حسب الثلاثي"
+    >
+      <option value="">العام الدراسي</option>
+      {TRIMESTER_OPTIONS.map((t) => (
+        <option key={t.value} value={t.value}>
+          {t.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function AgendaFilterBar({
   classes,
   months,
