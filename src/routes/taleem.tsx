@@ -11,6 +11,7 @@ import { QuestionsSpace } from "@/components/questions/QuestionsSpace";
 import { TeacherEvaluations } from "@/components/grades/Grades";
 import { AgendaFilterBar, EMPTY_FILTER, useAgendaMonths, type AgendaFilter } from "@/components/grades/AgendaFilters";
 import { TeacherHomeworks } from "@/components/grades/Homework";
+import { GradeSheet } from "@/components/grades/GradeSheet";
 import { ClassStudents } from "@/components/students/ClassStudents";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { useNotifications } from "@/components/resources/useSubmissions";
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/taleem")({
   component: Page,
 });
 
-type Tab = "resources" | "agenda" | "evaluations" | "questions" | "answers" | "students" | "notifications" | "account";
+type Tab = "resources" | "agenda" | "evaluations" | "gradesheet" | "questions" | "answers" | "students" | "notifications" | "account";
 type ClassRow = Database["public"]["Tables"]["classes"]["Row"];
 
 function Page() {
@@ -70,7 +71,7 @@ function TeacherShell({
   signOut: () => Promise<void>;
   isAdmin: boolean;
 }) {
-  const [tab, setTab] = useSpaceSection<Tab>("taleem", userId, "resources", ["resources", "agenda", "evaluations", "questions", "answers", "students", "notifications", "account"]);
+  const [tab, setTab] = useSpaceSection<Tab>("taleem", userId, "resources", ["resources", "agenda", "evaluations", "gradesheet", "questions", "answers", "students", "notifications", "account"]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [evalFilter, setEvalFilter] = useState<AgendaFilter>(EMPTY_FILTER);
   const evalMonths = useAgendaMonths(client, classes.map((c) => c.id));
@@ -105,6 +106,7 @@ function TeacherShell({
     { key: "resources", label: "الدروس والتمارين" },
     { key: "agenda", label: "المذكرة" },
     { key: "evaluations", label: "التقييمات" },
+    { key: "gradesheet", label: "كشف النقاط" },
     { key: "questions", label: "الأسئلة والأجوبة" },
     { key: "answers", label: "أجوبة التلاميذ" },
     { key: "students", label: "قائمة التلاميذ" },
@@ -153,6 +155,8 @@ function TeacherShell({
             <TeacherEvaluations client={client} classes={classes} filter={evalFilter} />
             <TeacherHomeworks client={client} classes={classes} filter={evalFilter} />
           </div>
+        ) : tab === "gradesheet" ? (
+          <GradeSheet client={client} classes={classes} teacherId={userId} />
         ) : tab === "questions" ? (
           <QuestionsSpace
             client={client}
